@@ -30,3 +30,12 @@
 *.exe
 *.out
 *.app
+
+# MacOS stuff
+.DS_Store
+
+# build dir
+build/
+
+# disable .vscode
+.vscode/
