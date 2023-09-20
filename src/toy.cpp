@@ -1,4 +1,5 @@
 #include "ExprAST.h"
+#include "FunctionAST.h"
 #include "PrototypeAST.h"
 #include <iostream>
 #include <map>
@@ -209,6 +210,48 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
         std::make_unique<BinaryExprAST>(BinOp, std::move(LHS), std::move(RHS));
   }
 }
+
+static std::unique_ptr<PrototypeAST> ParsePrototype() {
+  if (CurTok != tok_identifier) {
+    return LogErrorP("Expected function name to be prototype");
+  }
+
+  std::string FnName = IdentifierStr;
+  getNextToken();
+
+  if (CurTok != '(') {
+    return LogErrorP("Expected '(' in prototype");
+  }
+
+  // read list of args
+  std::vector<std::string> ArgNames;
+  while (getNextToken() == tok_identifier) {
+    ArgNames.emplace_back(IdentifierStr);
+  }
+
+  if (CurTok != ')') {
+    return LogErrorP("Expected ')' in prototype");
+  }
+
+  getNextToken();
+
+  return std::make_unique<PrototypeAST>(FnName, std::move(ArgNames));
+}
+
+static std::unique_ptr<FunctionAST> ParseDefinition() {
+  getNextToken();
+
+  auto Proto = ParsePrototype();
+  if (!Proto) {
+    return nullptr;
+  }
+
+  if (auto E = ParseExpression()) {
+    return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
+  }
+  return nullptr;
+}
+
 int main() {
 
   // Install standard binary operators.
