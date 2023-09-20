@@ -11,3 +11,11 @@ class NumberExprAST : public ExprAST {
 public:
   NumberExprAST(double Val) : Val(Val) {}
 };
+
+/// VariableExprAST - Expression class for referencing a variable. Think "index, a" etc.
+class VariableExprAST : public ExprAST {
+  std::string Name;
+
+public:
+  VariableExprAST(const std::string & Name) : Name(Name) {}
+};
