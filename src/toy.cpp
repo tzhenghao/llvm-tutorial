@@ -85,6 +85,25 @@ std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
   return nullptr;
 }
 
+static std::unique_ptr<ExprAST> ParseNumberExpr() {
+  auto Result = std::make_unique<NumberExprAST>(NumVal);
+  getNextToken(); // consume the number
+  return std::move(Result);
+}
+
+static std::unique_ptr<ExprAST> ParseParenExpr() {
+  getNextToken();
+  auto V = ParseExpression();
+  if (!V) {
+    return nullptr;
+  }
+  if (CurTok != ')') {
+    return LogError("Expected )");
+  }
+  getNextToken();
+  return V;
+}
+
 int main() {
 
   std::cout << "hello world!\n";
