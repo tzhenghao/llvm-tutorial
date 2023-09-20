@@ -27,8 +27,7 @@ public:
   VariableExprAST(const std::string &Name) : Name(Name) {}
 };
 
-/// BinaryExprAST - Expression class for referencing a variable. Think "index,
-/// a" etc.
+/// BinaryExprAST - Expression class for referencing a variable.
 class BinaryExprAST : public ExprAST {
   char Op;
   std::unique_ptr<ExprAST> LHS, RHS;
