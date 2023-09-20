@@ -171,6 +171,44 @@ static int GetTokPrecedence() {
   return TokPrec;
 }
 
+static std::unique_ptr<ExprAST> ParseExpression() {
+  auto LHS = ParsePrimary();
+  if (!LHS) {
+    return nullptr;
+  }
+  return ParseBinOpRHS(0, std::move(LHS));
+}
+
+static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
+                                              std::unique_ptr<ExprAST> LHS) {
+  while (true) {
+    int TokPrec = GetTokPrecedence();
+
+    if (TokPrec < ExprPrec) {
+      return LHS;
+    }
+
+    int BinOp = CurTok;
+    getNextToken();
+
+    auto RHS = ParsePrimary();
+    if (!RHS) {
+      return nullptr;
+    }
+
+    int NextPrec = GetTokPrecedence();
+    if (TokPrec < NextPrec) {
+      RHS = ParseBinOpRHS(TokPrec + 1, std::move(RHS));
+      if (!RHS) {
+        return nullptr;
+      }
+    }
+
+    // Merge LHS and RHS.
+    LHS =
+        std::make_unique<BinaryExprAST>(BinOp, std::move(LHS), std::move(RHS));
+  }
+}
 int main() {
 
   // Install standard binary operators.
