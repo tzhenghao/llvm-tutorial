@@ -271,7 +271,7 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 
 void HandleDefinition() {
   if (ParseDefinition()) {
-    std::cout << "handled definition!\n";
+    std::cout << "handled function definition!\n";
   } else {
     getNextToken();
   }
