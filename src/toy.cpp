@@ -5,6 +5,10 @@
 #include <map>
 #include <string>
 
+// Prototypes.
+static std::unique_ptr<ExprAST> ParseExpression();
+static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
+                                              std::unique_ptr<ExprAST> LHS);
 enum Token {
   tok_eof = -1,
   // commands
@@ -247,6 +251,19 @@ static std::unique_ptr<FunctionAST> ParseDefinition() {
   }
 
   if (auto E = ParseExpression()) {
+    return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
+  }
+  return nullptr;
+}
+
+static std::unique_ptr<PrototypeAST> ParseExtern() {
+  getNextToken();
+  return ParsePrototype();
+}
+
+static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
+  if (auto E = ParseExpression()) {
+    auto Proto = std::make_unique<PrototypeAST>("", std::vector<std::string>());
     return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
   }
   return nullptr;
