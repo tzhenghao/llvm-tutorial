@@ -269,6 +269,52 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
   return nullptr;
 }
 
+void HandleDefinition() {
+  if (ParseDefinition()) {
+    std::cout << "handled definition!\n";
+  } else {
+    getNextToken();
+  }
+}
+
+void HandleExtern() {
+  if (ParseExtern()) {
+    std::cout << "handled extern!\n";
+  } else {
+    getNextToken();
+  }
+}
+
+void HandleTopLevelExpression() {
+  if (ParseTopLevelExpr()) {
+    std::cout << "handled top level expression!\n";
+  } else {
+    getNextToken();
+  }
+}
+
+static void MainLoop() {
+  while (true) {
+    fprintf(stderr, "ready> ");
+    switch (CurTok) {
+    case tok_eof:
+      return;
+    case ';':
+      getNextToken();
+      break;
+    case tok_def:
+      HandleDefinition();
+      break;
+    case tok_extern:
+      HandleExtern();
+      break;
+    default:
+      HandleTopLevelExpression();
+      break;
+    }
+  }
+}
+
 int main() {
 
   // Install standard binary operators.
@@ -277,6 +323,11 @@ int main() {
   BinopPrecedence['+'] = 20;
   BinopPrecedence['-'] = 20;
   BinopPrecedence['*'] = 40; // highest
+
+  fprintf(stderr, "ready> ");
+  getNextToken();
+
+  MainLoop();
 
   return 0;
 }
