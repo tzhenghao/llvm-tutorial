@@ -1,6 +1,7 @@
 #include "ExprAST.h"
 #include "PrototypeAST.h"
 #include <iostream>
+#include <map>
 #include <string>
 
 enum Token {
@@ -155,9 +156,29 @@ static std::unique_ptr<ExprAST> ParsePrimary() {
   }
 }
 
+static std::map<char, int> BinopPrecedence;
+
+static int GetTokPrecedence() {
+
+  if (!isascii(CurTok)) {
+    return -1;
+  }
+
+  int TokPrec = BinopPrecedence[CurTok];
+  if (TokPrec <= 0) {
+    return -1;
+  }
+  return TokPrec;
+}
+
 int main() {
 
-  std::cout << "hello world!\n";
+  // Install standard binary operators.
+  // 1 is lowest precedence.
+  BinopPrecedence['<'] = 10;
+  BinopPrecedence['+'] = 20;
+  BinopPrecedence['-'] = 20;
+  BinopPrecedence['*'] = 40; // highest
 
   return 0;
 }
