@@ -1,4 +1,5 @@
 #include "ExprAST.h"
+#include "PrototypeAST.h"
 #include <iostream>
 #include <string>
 
@@ -69,6 +70,19 @@ static int gettok() {
   int ThisChar = LastChar;
   LastChar = getchar(); // proceed to next char.
   return ThisChar;
+}
+
+static int CurTok;
+static int getNextToken() { return CurTok = gettok(); }
+
+std::unique_ptr<ExprAST> LogError(const char *Str) {
+  fprintf(stderr, "Error: %s\n", Str);
+  return nullptr;
+}
+
+std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
+  LogError(Str);
+  return nullptr;
 }
 
 int main() {
