@@ -1,3 +1,10 @@
 set(CMAKE_CXX_STANDARD 17)            # Enable c++17 standard
 
-add_executable(toy toy.cpp)
+set(EXPR_AST "ExprAST")
+set(EXE_NAME "toy")
+
+add_library(${EXPR_AST} ExprAST.cpp)
+target_include_directories(${EXPR_AST} PUBLIC ${PROJECT_SOURCE_DIR}/include)
+
+add_executable(${EXE_NAME} toy.cpp)
+target_link_libraries(${EXE_NAME} ${EXPR_AST})

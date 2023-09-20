@@ -1,3 +1,5 @@
+#include "ExprAST.h"
+#include <iostream>
 #include <string>
 
 enum Token {
@@ -8,20 +10,6 @@ enum Token {
   // primary
   tok_identifier = -4,
   tok_number = -5,
-};
-
-/// ExprAST - Base class for all expression nodes.
-class ExprAST {
-public:
-  virtual ~ExprAST() = default;
-};
-
-/// NumberExprAST - Expression class for numeric literals like "1.0".
-class NumberExprAST : public ExprAST {
-  double Val;
-
-public:
-  NumberExprAST(double Val) : Val(Val) {}
 };
 
 static std::string IdentifierStr; // Filled in if tok_identifier
@@ -81,4 +69,11 @@ static int gettok() {
   int ThisChar = LastChar;
   LastChar = getchar(); // proceed to next char.
   return ThisChar;
+}
+
+int main() {
+
+  std::cout << "hello world!\n";
+
+  return 0;
 }
