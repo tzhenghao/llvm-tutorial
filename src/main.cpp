@@ -36,10 +36,29 @@ static int getNextToken() { return CurTok = gettok(); }
 static std::map<char, int> BinopPrecedence;
 
 // --------------------------------------
+// Logging implementation
+// --------------------------------------
+
+std::unique_ptr<ExprAST> LogError(const char *Str) {
+  fprintf(stderr, "Error: %s\n", Str);
+  return nullptr;
+}
+
+std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
+  LogError(Str);
+  return nullptr;
+}
+
+llvm::Value *LogErrorV(const char *Str) {
+  LogError(Str);
+  return nullptr;
+}
+
+// --------------------------------------
 // Codegen implementation
 // --------------------------------------
 llvm::Value *NumberExprAST::codegen() {
-  return ConstantFP::get(*TheContext, APFloat(Val));
+  return llvm::ConstantFP::get(*TheContext, llvm::APFloat(Val));
 }
 
 llvm::Value *VariableExprAST::codegen() {
@@ -66,7 +85,7 @@ llvm::Value *BinaryExprAST::codegen() {
   case '<':
     L = Builder->CreateFCmpULT(L, R, "cmptmp");
     // Convert bool 0/1 to double 0.0 or 1.0
-    return Builder->CreateUIToFP(L, Type::getDoubleTy(TheContext), "booltmp");
+    return Builder->CreateUIToFP(L, llvm::Type::getDoubleTy(TheContext), "booltmp");
   default:
     return LogErrorV("invalid binary operator");
   }
