@@ -40,18 +40,24 @@ std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
   return nullptr;
 }
 
+llvm::Value *LogErrorV(const char *Str) {
+  LogError(Str);
+  return nullptr;
+}
+
 static std::unique_ptr<llvm::LLVMContext> TheContext;
 static std::unique_ptr<llvm::IRBuilder<>> Builder(TheContext);
 static std::unique_ptr<llvm::Module> TheModule;
 static std::map<std::string, llvm::Value *> NamedValues;
 
+static std::string IdentifierStr; // Filled in if tok_identifier
+static double NumVal;             // Filled in if tok_number
+
+// --------------------------------------
+// Codegen implementation
+// --------------------------------------
 llvm::Value *NumberExprAST::codegen() {
   return ConstantFP::get(*TheContext, APFloat(Val));
-}
-
-llvm::Value *LogErrorV(const char *Str) {
-  LogError(Str);
-  return nullptr;
 }
 
 llvm::Value *VariableExprAST::codegen() {
@@ -83,29 +89,6 @@ llvm::Value *BinaryExprAST::codegen() {
     return LogErrorV("invalid binary operator");
   }
 }
-
-llvm::Value *CallExprAST::codegen() {
-  // Look up the name in the global module table.
-  Function *CalleeF = TheModule->getFunction(Callee);
-  if (!CalleeF)
-    return LogErrorV("Unknown function referenced");
-
-  // If argument mismatch error.
-  if (CalleeF->arg_size() != Args.size())
-    return LogErrorV("Incorrect # arguments passed");
-
-  std::vector<llvm::Value *> ArgsV;
-  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-    ArgsV.push_back(Args[i]->codegen());
-    if (!ArgsV.back())
-      return nullptr;
-  }
-
-  return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
-}
-
-static std::string IdentifierStr; // Filled in if tok_identifier
-static double NumVal;             // Filled in if tok_number
 
 /// gettok - returns the next token from standard input.
 static int gettok() {
@@ -165,6 +148,10 @@ static int gettok() {
 
 static int CurTok;
 static int getNextToken() { return CurTok = gettok(); }
+
+// ----------------------------------------------
+// Parsing functions
+// ----------------------------------------------
 
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
   auto Result = std::make_unique<NumberExprAST>(NumVal);
