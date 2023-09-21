@@ -1,5 +1,6 @@
 #include "ExprAST.h"
 #include "FunctionAST.h"
+#include "Token.h"
 #include "PrototypeAST.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
@@ -20,30 +21,6 @@
 static std::unique_ptr<ExprAST> ParseExpression();
 static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
                                               std::unique_ptr<ExprAST> LHS);
-enum Token {
-  tok_eof = -1,
-  // commands
-  tok_def = -2,
-  tok_extern = -3,
-  // primary
-  tok_identifier = -4,
-  tok_number = -5,
-};
-
-std::unique_ptr<ExprAST> LogError(const char *Str) {
-  fprintf(stderr, "Error: %s\n", Str);
-  return nullptr;
-}
-
-std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
-  LogError(Str);
-  return nullptr;
-}
-
-llvm::Value *LogErrorV(const char *Str) {
-  LogError(Str);
-  return nullptr;
-}
 
 static std::unique_ptr<llvm::LLVMContext> TheContext;
 static std::unique_ptr<llvm::IRBuilder<>> Builder(TheContext);
@@ -52,6 +29,11 @@ static std::map<std::string, llvm::Value *> NamedValues;
 
 static std::string IdentifierStr; // Filled in if tok_identifier
 static double NumVal;             // Filled in if tok_number
+
+static int CurTok;
+static int getNextToken() { return CurTok = gettok(); }
+
+static std::map<char, int> BinopPrecedence;
 
 // --------------------------------------
 // Codegen implementation
@@ -146,9 +128,6 @@ static int gettok() {
   return ThisChar;
 }
 
-static int CurTok;
-static int getNextToken() { return CurTok = gettok(); }
-
 // ----------------------------------------------
 // Parsing functions
 // ----------------------------------------------
@@ -222,8 +201,6 @@ static std::unique_ptr<ExprAST> ParsePrimary() {
     return LogError("unknown / undefined token when expecting an expression");
   }
 }
-
-static std::map<char, int> BinopPrecedence;
 
 static int GetTokPrecedence() {
 
