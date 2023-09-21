@@ -1,7 +1,7 @@
 #include "ExprAST.h"
 #include "FunctionAST.h"
-#include "Token.h"
 #include "PrototypeAST.h"
+#include "Token.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
@@ -64,8 +64,9 @@ llvm::Value *NumberExprAST::codegen() {
 llvm::Value *VariableExprAST::codegen() {
   // Look this variable up in the function.
   llvm::Value *V = NamedValues[Name];
-  if (!V)
+  if (!V) {
     LogErrorV("Unknown variable name");
+  }
   return V;
 }
 
@@ -85,7 +86,8 @@ llvm::Value *BinaryExprAST::codegen() {
   case '<':
     L = Builder->CreateFCmpULT(L, R, "cmptmp");
     // Convert bool 0/1 to double 0.0 or 1.0
-    return Builder->CreateUIToFP(L, llvm::Type::getDoubleTy(TheContext), "booltmp");
+    return Builder->CreateUIToFP(L, llvm::Type::getDoubleTy(TheContext),
+                                 "booltmp");
   default:
     return LogErrorV("invalid binary operator");
   }
