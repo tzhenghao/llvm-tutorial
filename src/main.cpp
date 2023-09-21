@@ -113,6 +113,18 @@ Value *CallExprAST::codegen() {
   return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
+llvm::Function *PrototypeAST::codegen() {
+  // Mark the function type as (double, double) -> double etc.
+  std::vector<llvm::Type *> Doubles(Args.size(),
+                                    llvm::Type::getDoubleTy(*TheContext));
+
+  llvm::FunctionType *FT = llvm::FunctionType::get(
+      llvm::Type::getDoubleTy(*TheContext, Doubles, false));
+
+  llvm::Function *F = llvm::Function::Create(
+      FT, llvm::Function::ExternalLinkage, Name, TheModule.get());
+}
+
 // --------------------------------------
 // get token logic
 // --------------------------------------
