@@ -157,11 +157,14 @@ llvm::Function *FunctionAST::codegen() {
 
   if (llvm::Value *RetVal = Body->codegen()) {
     Builder->CreateRet(RetVal);
+    llvm::verifyFunction(*TheFunction);
+
+    return TheFunction;
   }
 
-  llvm::verifyFunction(*TheFunction);
-
-  return TheFunction;
+  // Error reading body, remove function.
+  TheFunction->eraseFromParent();
+  return nullptr;
 }
 
 // --------------------------------------
