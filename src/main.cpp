@@ -55,8 +55,6 @@ public:
   llvm::Function *codegen();
 };
 
-
-
 /// NumberExprAST - Expression class for numeric literals like "1.0".
 class NumberExprAST : public ExprAST {
   double Val;
@@ -493,23 +491,38 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 
 void HandleDefinition() {
   if (auto FnAST = ParseDefinition()) {
-    std::cout << "handled function definition!\n";
+    if (auto *FnIR = FnAST->codegen()) {
+      fprintf(stderr, "Read function definition:");
+      FnIR->print(llvm::errs());
+      fprintf(stderr, "\n");
+    }
   } else {
     getNextToken();
   }
 }
 
 void HandleExtern() {
-  if (ParseExtern()) {
-    std::cout << "handled extern!\n";
+  if (auto ProtoAST = ParseExtern()) {
+    if (auto *FnIR = ProtoAST->codegen()) {
+      fprintf(stderr, "Read extern: ");
+      FnIR->print(llvm::errs());
+      fprintf(stderr, "\n");
+    }
   } else {
     getNextToken();
   }
 }
 
 void HandleTopLevelExpression() {
-  if (ParseTopLevelExpr()) {
-    std::cout << "handled top level expression!\n";
+  if (auto FnAST = ParseTopLevelExpr()) {
+    if (auto *FnIR = FnAST->codegen()) {
+      fprintf(stderr, "Read top-level expression:");
+      FnIR->print(llvm::errs());
+      fprintf(stderr, "\n");
+
+      // Remove the anonymous expression.
+      FnIR->eraseFromParent();
+    }
   } else {
     getNextToken();
   }
