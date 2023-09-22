@@ -1,3 +1,4 @@
+#include "Token.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
@@ -12,16 +13,6 @@
 #include <iostream>
 #include <map>
 #include <string>
-
-enum Token {
-  tok_eof = -1,
-  // commands
-  tok_def = -2,
-  tok_extern = -3,
-  // primary
-  tok_identifier = -4,
-  tok_number = -5,
-};
 
 /// ExprAST - Base class for all expression nodes.
 class ExprAST {
