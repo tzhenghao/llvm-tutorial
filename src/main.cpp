@@ -123,6 +123,45 @@ llvm::Function *PrototypeAST::codegen() {
 
   llvm::Function *F = llvm::Function::Create(
       FT, llvm::Function::ExternalLinkage, Name, TheModule.get());
+
+  // Set names for all arguments.
+  unsigned Idx = 0;
+  for (auto &Arg : F->args())
+    Arg.setName(Args[Idx++]);
+
+  return F;
+}
+
+llvm::Function *FunctionAST::codegen() {
+  llvm::Function *TheFunction = TheModule->getFunction(Proto->getName());
+
+  if (!TheFunction) {
+    TheFunction = Proto->codegen();
+  }
+
+  if (!TheFunction) {
+    return nullptr;
+  }
+
+  if (!TheFunction->empty()) {
+    return (llvm::Function *)LogErrorV("Function cannnot be redefined!");
+  }
+
+  llvm::BasicBlock **BB = BasicBlock::Create(*TheContext, "entry", TheFunction);
+  Builder->SetInsertPoint(BB);
+
+  NamedValues.clear();
+  for (auto &Arg : TheFunction->args()) {
+    NamedValues[std::string(Arg.getName())] = &Arg;
+  }
+
+  if (llvm::Value *RetVal = Body->codegen()) {
+    Builder->CreateRet(RetVal);
+  }
+
+  llvm::verifyFunction(*TheFunction);
+
+  return TheFunction;
 }
 
 // --------------------------------------
