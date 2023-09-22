@@ -451,6 +451,14 @@ void HandleTopLevelExpression() {
   }
 }
 
+static void InitializeModule() {
+  TheContext = std::make_unique<llvm::LLVMContext>();
+  TheModule = std::make_unique<llvm::Module>("cool JIT", *TheContext);
+
+  // Create builder.
+  Builder = std::make_unique<llvm::IRBuilder<>>(*TheContext);
+}
+
 static void MainLoop() {
   while (true) {
     fprintf(stderr, "ready> ");
@@ -484,6 +492,9 @@ int main() {
 
   fprintf(stderr, "ready> ");
   getNextToken();
+
+  // Make the module, which holds all the code.
+  InitializeModule();
 
   MainLoop();
 
