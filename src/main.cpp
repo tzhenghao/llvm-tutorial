@@ -1,7 +1,3 @@
-#include "ExprAST.h"
-#include "FunctionAST.h"
-#include "PrototypeAST.h"
-#include "Token.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
@@ -16,6 +12,93 @@
 #include <iostream>
 #include <map>
 #include <string>
+
+enum Token {
+  tok_eof = -1,
+  // commands
+  tok_def = -2,
+  tok_extern = -3,
+  // primary
+  tok_identifier = -4,
+  tok_number = -5,
+};
+
+/// ExprAST - Base class for all expression nodes.
+class ExprAST {
+public:
+  virtual ~ExprAST() = default;
+  virtual llvm::Value *codegen() = 0;
+};
+
+/// Represents the function "prototype".
+/// Captures its name and argnames (plus # of args).
+class PrototypeAST {
+  std::string Name;
+  std::vector<std::string> Args;
+
+public:
+  PrototypeAST(const std::string &Name, std::vector<std::string> Args)
+      : Name(Name), Args(std::move(Args)) {}
+  llvm::Function *codegen();
+  const std::string &getName() const { return Name; }
+};
+
+/// Represents the function (implementation) itself.
+class FunctionAST {
+  std::unique_ptr<PrototypeAST> Proto;
+  std::unique_ptr<ExprAST> Body;
+
+public:
+  FunctionAST(std::unique_ptr<PrototypeAST> Proto,
+              std::unique_ptr<ExprAST> Body)
+      : Proto(std::move(Proto)), Body(std::move(Body)) {}
+  llvm::Function *codegen();
+};
+
+
+
+/// NumberExprAST - Expression class for numeric literals like "1.0".
+class NumberExprAST : public ExprAST {
+  double Val;
+
+public:
+  NumberExprAST(double Val) : Val(Val) {}
+  llvm::Value *codegen() override;
+};
+
+/// VariableExprAST - Expression class for referencing a variable. Think "index,
+/// a" etc.
+class VariableExprAST : public ExprAST {
+  std::string Name;
+
+public:
+  VariableExprAST(const std::string &Name) : Name(Name) {}
+  llvm::Value *codegen() override;
+};
+
+/// BinaryExprAST - Expression class for referencing a variable.
+class BinaryExprAST : public ExprAST {
+  char Op;
+  std::unique_ptr<ExprAST> LHS, RHS;
+
+public:
+  BinaryExprAST(char Op, std::unique_ptr<ExprAST> LHS,
+                std::unique_ptr<ExprAST> RHS)
+      : Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+  llvm::Value *codegen() override;
+};
+
+/// CallExprAST - Expression class for function calls.
+class CallExprAST : public ExprAST {
+  std::string Callee;
+  std::vector<std::unique_ptr<ExprAST>> Args;
+
+public:
+  CallExprAST(const std::string &Callee,
+              std::vector<std::unique_ptr<ExprAST>> Args)
+      : Callee(Callee), Args(std::move(Args)) {}
+  llvm::Value *codegen() override;
+};
 
 // Prototypes.
 static std::unique_ptr<ExprAST> ParseExpression();
@@ -409,7 +492,7 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 }
 
 void HandleDefinition() {
-  if (ParseDefinition()) {
+  if (auto FnAST = ParseDefinition()) {
     std::cout << "handled function definition!\n";
   } else {
     getNextToken();
@@ -467,6 +550,9 @@ int main() {
   getNextToken();
 
   MainLoop();
+
+  // Print out all of the generated code.
+  TheModule->print(llvm::errs(), nullptr);
 
   return 0;
 }
