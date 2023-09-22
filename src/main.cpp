@@ -23,7 +23,7 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
                                               std::unique_ptr<ExprAST> LHS);
 
 static std::unique_ptr<llvm::LLVMContext> TheContext;
-static std::unique_ptr<llvm::IRBuilder<>> Builder(TheContext);
+static std::unique_ptr<llvm::IRBuilder<>> Builder;
 static std::unique_ptr<llvm::Module> TheModule;
 static std::map<std::string, llvm::Value *> NamedValues;
 
@@ -31,141 +31,6 @@ static std::string IdentifierStr; // Filled in if tok_identifier
 static double NumVal;             // Filled in if tok_number
 
 static int CurTok;
-static int getNextToken() { return CurTok = gettok(); }
-
-static std::map<char, int> BinopPrecedence;
-
-// --------------------------------------
-// Logging implementation
-// --------------------------------------
-
-std::unique_ptr<ExprAST> LogError(const char *Str) {
-  fprintf(stderr, "Error: %s\n", Str);
-  return nullptr;
-}
-
-std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
-  LogError(Str);
-  return nullptr;
-}
-
-llvm::Value *LogErrorV(const char *Str) {
-  LogError(Str);
-  return nullptr;
-}
-
-// --------------------------------------
-// Codegen implementation
-// --------------------------------------
-llvm::Value *NumberExprAST::codegen() {
-  return llvm::ConstantFP::get(*TheContext, llvm::APFloat(Val));
-}
-
-llvm::Value *VariableExprAST::codegen() {
-  // Look this variable up in the function.
-  llvm::Value *V = NamedValues[Name];
-  if (!V) {
-    LogErrorV("Unknown variable name");
-  }
-  return V;
-}
-
-llvm::Value *BinaryExprAST::codegen() {
-  llvm::Value *L = LHS->codegen();
-  llvm::Value *R = RHS->codegen();
-  if (!L || !R)
-    return nullptr;
-
-  switch (Op) {
-  case '+':
-    return Builder->CreateFAdd(L, R, "addtmp");
-  case '-':
-    return Builder->CreateFSub(L, R, "subtmp");
-  case '*':
-    return Builder->CreateFMul(L, R, "multmp");
-  case '<':
-    L = Builder->CreateFCmpULT(L, R, "cmptmp");
-    // Convert bool 0/1 to double 0.0 or 1.0
-    return Builder->CreateUIToFP(L, llvm::Type::getDoubleTy(TheContext),
-                                 "booltmp");
-  default:
-    return LogErrorV("invalid binary operator");
-  }
-}
-
-Value *CallExprAST::codegen() {
-  // Look up the name in the global module table.
-  llvm::Function *CalleeF = TheModule->getFunction(Callee);
-  if (!CalleeF)
-    return LogErrorV("Unknown function referenced");
-
-  // If argument mismatch error.
-  if (CalleeF->arg_size() != Args.size())
-    return LogErrorV("Incorrect # arguments passed");
-
-  std::vector<llvm::Value *> ArgsV;
-  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-    ArgsV.push_back(Args[i]->codegen());
-    if (!ArgsV.back())
-      return nullptr;
-  }
-
-  return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
-}
-
-llvm::Function *PrototypeAST::codegen() {
-  // Mark the function type as (double, double) -> double etc.
-  std::vector<llvm::Type *> Doubles(Args.size(),
-                                    llvm::Type::getDoubleTy(*TheContext));
-
-  llvm::FunctionType *FT = llvm::FunctionType::get(
-      llvm::Type::getDoubleTy(*TheContext, Doubles, false));
-
-  llvm::Function *F = llvm::Function::Create(
-      FT, llvm::Function::ExternalLinkage, Name, TheModule.get());
-
-  // Set names for all arguments.
-  unsigned Idx = 0;
-  for (auto &Arg : F->args())
-    Arg.setName(Args[Idx++]);
-
-  return F;
-}
-
-llvm::Function *FunctionAST::codegen() {
-  llvm::Function *TheFunction = TheModule->getFunction(Proto->getName());
-
-  if (!TheFunction) {
-    TheFunction = Proto->codegen();
-  }
-
-  if (!TheFunction) {
-    return nullptr;
-  }
-
-  if (!TheFunction->empty()) {
-    return (llvm::Function *)LogErrorV("Function cannnot be redefined!");
-  }
-
-  llvm::BasicBlock **BB = BasicBlock::Create(*TheContext, "entry", TheFunction);
-  Builder->SetInsertPoint(BB);
-
-  NamedValues.clear();
-  for (auto &Arg : TheFunction->args()) {
-    NamedValues[std::string(Arg.getName())] = &Arg;
-  }
-
-  if (llvm::Value *RetVal = Body->codegen()) {
-    Builder->CreateRet(RetVal);
-    llvm::verifyFunction(*TheFunction);
-
-    return TheFunction;
-  }
-
-  // Error reading body, remove function.
-  TheFunction->eraseFromParent();
-  return nullptr;
-}
 
 // --------------------------------------
 // get token logic
@@ -225,6 +90,142 @@ static int gettok() {
   int ThisChar = LastChar;
   LastChar = getchar(); // proceed to next char.
   return ThisChar;
+}
+static int getNextToken() { return CurTok = gettok(); }
+
+static std::map<char, int> BinopPrecedence;
+
+// --------------------------------------
+// Logging implementation
+// --------------------------------------
+
+std::unique_ptr<ExprAST> LogError(const char *Str) {
+  fprintf(stderr, "Error: %s\n", Str);
+  return nullptr;
+}
+
+std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
+  LogError(Str);
+  return nullptr;
+}
+
+llvm::Value *LogErrorV(const char *Str) {
+  LogError(Str);
+  return nullptr;
+}
+
+// --------------------------------------
+// Codegen implementation
+// --------------------------------------
+llvm::Value *NumberExprAST::codegen() {
+  return llvm::ConstantFP::get(*TheContext, llvm::APFloat(Val));
+}
+
+llvm::Value *VariableExprAST::codegen() {
+  // Look this variable up in the function.
+  llvm::Value *V = NamedValues[Name];
+  if (!V) {
+    LogErrorV("Unknown variable name");
+  }
+  return V;
+}
+
+llvm::Value *BinaryExprAST::codegen() {
+  llvm::Value *L = LHS->codegen();
+  llvm::Value *R = RHS->codegen();
+  if (!L || !R)
+    return nullptr;
+
+  switch (Op) {
+  case '+':
+    return Builder->CreateFAdd(L, R, "addtmp");
+  case '-':
+    return Builder->CreateFSub(L, R, "subtmp");
+  case '*':
+    return Builder->CreateFMul(L, R, "multmp");
+  case '<':
+    L = Builder->CreateFCmpULT(L, R, "cmptmp");
+    // Convert bool 0/1 to double 0.0 or 1.0
+    return Builder->CreateUIToFP(L, llvm::Type::getDoubleTy(*TheContext),
+                                 "booltmp");
+  default:
+    return LogErrorV("invalid binary operator");
+  }
+}
+
+llvm::Value *CallExprAST::codegen() {
+  // Look up the name in the global module table.
+  llvm::Function *CalleeF = TheModule->getFunction(Callee);
+  if (!CalleeF)
+    return LogErrorV("Unknown function referenced");
+
+  // If argument mismatch error.
+  if (CalleeF->arg_size() != Args.size())
+    return LogErrorV("Incorrect # arguments passed");
+
+  std::vector<llvm::Value *> ArgsV;
+  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+    ArgsV.push_back(Args[i]->codegen());
+    if (!ArgsV.back())
+      return nullptr;
+  }
+
+  return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
+}
+
+llvm::Function *PrototypeAST::codegen() {
+  // Mark the function type as (double, double) -> double etc.
+  std::vector<llvm::Type *> Doubles(Args.size(),
+                                    llvm::Type::getDoubleTy(*TheContext));
+
+  llvm::FunctionType *FT = llvm::FunctionType::get(
+      llvm::Type::getDoubleTy(*TheContext), Doubles, false);
+
+  llvm::Function *F = llvm::Function::Create(
+      FT, llvm::Function::ExternalLinkage, Name, TheModule.get());
+
+  // Set names for all arguments.
+  unsigned Idx = 0;
+  for (auto &Arg : F->args())
+    Arg.setName(Args[Idx++]);
+
+  return F;
+}
+
+llvm::Function *FunctionAST::codegen() {
+  llvm::Function *TheFunction = TheModule->getFunction(Proto->getName());
+
+  if (!TheFunction) {
+    TheFunction = Proto->codegen();
+  }
+
+  if (!TheFunction) {
+    return nullptr;
+  }
+
+  if (!TheFunction->empty()) {
+    return (llvm::Function *)LogErrorV("Function cannnot be redefined!");
+  }
+
+  llvm::BasicBlock *BB =
+      llvm::BasicBlock::Create(*TheContext, "entry", TheFunction);
+  Builder->SetInsertPoint(BB);
+
+  NamedValues.clear();
+  for (auto &Arg : TheFunction->args()) {
+    NamedValues[std::string(Arg.getName())] = &Arg;
+  }
+
+  if (llvm::Value *RetVal = Body->codegen()) {
+    Builder->CreateRet(RetVal);
+    llvm::verifyFunction(*TheFunction);
+
+    return TheFunction;
+  }
+
+  // Error reading body, remove function.
+  TheFunction->eraseFromParent();
+  return nullptr;
 }
 
 // ----------------------------------------------

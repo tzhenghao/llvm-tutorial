@@ -38,6 +38,7 @@ class VariableExprAST : public ExprAST {
 
 public:
   VariableExprAST(const std::string &Name) : Name(Name) {}
+  llvm::Value *codegen() override;
 };
 
 /// BinaryExprAST - Expression class for referencing a variable.
@@ -49,6 +50,7 @@ public:
   BinaryExprAST(char Op, std::unique_ptr<ExprAST> LHS,
                 std::unique_ptr<ExprAST> RHS)
       : Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+  llvm::Value *codegen() override;
 };
 
 /// CallExprAST - Expression class for function calls.
@@ -60,4 +62,5 @@ public:
   CallExprAST(const std::string &Callee,
               std::vector<std::unique_ptr<ExprAST>> Args)
       : Callee(Callee), Args(std::move(Args)) {}
+  llvm::Value *codegen() override;
 };
