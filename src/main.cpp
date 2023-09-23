@@ -18,6 +18,10 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Pass.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
 #include <iostream>
 #include <map>
 #include <string>
@@ -464,13 +468,13 @@ static void InitializeModule() {
       std::make_unique<llvm::legacy::FunctionPassManager>(TheModule.get());
 
   // Do simple "peephole" optimizations and bit-twiddling optimizations.
-  TheFunctionPassManager->add(createInstructionCombiningPass());
+  TheFunctionPassManager->add(llvm::createInstructionCombiningPass());
   // Reassociate expressions.
-  TheFunctionPassManager->add(createReassociatePass());
+  TheFunctionPassManager->add(llvm::createReassociatePass());
   // Eliminate Common SubExpressions.
-  TheFunctionPassManager->add(createGVNPass());
+  TheFunctionPassManager->add(llvm::createGVNPass());
   // Simplify the control flow graph (deleting unreachable blocks, etc).
-  TheFunctionPassManager->add(createCFGSimplificationPass());
+  TheFunctionPassManager->add(llvm::createCFGSimplificationPass());
 
   TheFunctionPassManager->doInitialization();
 
