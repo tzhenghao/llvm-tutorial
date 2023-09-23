@@ -14,6 +14,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
@@ -30,6 +31,8 @@ static std::unique_ptr<llvm::LLVMContext> TheContext;
 static std::unique_ptr<llvm::IRBuilder<>> Builder;
 static std::unique_ptr<llvm::Module> TheModule;
 static std::map<std::string, llvm::Value *> NamedValues;
+static std::unique_ptr<llvm::legacy::FunctionPassManager>
+    TheFunctionPassManager;
 
 static std::string IdentifierStr; // Filled in if tok_identifier
 static double NumVal;             // Filled in if tok_number
@@ -208,7 +211,7 @@ llvm::Function *FunctionAST::codegen() {
   }
 
   if (!TheFunction->empty()) {
-    return (llvm::Function *)LogErrorV("Function cannnot be redefined!");
+    return (llvm::Function *)LogErrorV("Function cannot be redefined!");
   }
 
   llvm::BasicBlock *BB =
@@ -224,6 +227,7 @@ llvm::Function *FunctionAST::codegen() {
     Builder->CreateRet(RetVal);
     llvm::verifyFunction(*TheFunction);
 
+    TheFunctionPassManager->run(*TheFunction);
     return TheFunction;
   }
 
@@ -454,6 +458,21 @@ void HandleTopLevelExpression() {
 static void InitializeModule() {
   TheContext = std::make_unique<llvm::LLVMContext>();
   TheModule = std::make_unique<llvm::Module>("cool JIT", *TheContext);
+
+  // Create a new pass manager attached to it.
+  TheFunctionPassManager =
+      std::make_unique<llvm::legacy::FunctionPassManager>(TheModule.get());
+
+  // Do simple "peephole" optimizations and bit-twiddling optimizations.
+  TheFunctionPassManager->add(createInstructionCombiningPass());
+  // Reassociate expressions.
+  TheFunctionPassManager->add(createReassociatePass());
+  // Eliminate Common SubExpressions.
+  TheFunctionPassManager->add(createGVNPass());
+  // Simplify the control flow graph (deleting unreachable blocks, etc).
+  TheFunctionPassManager->add(createCFGSimplificationPass());
+
+  TheFunctionPassManager->doInitialization();
 
   // Create builder.
   Builder = std::make_unique<llvm::IRBuilder<>>(*TheContext);
