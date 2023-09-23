@@ -415,7 +415,7 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 void HandleDefinition() {
   if (auto FnAST = ParseDefinition()) {
     if (auto *FnIR = FnAST->codegen()) {
-      fprintf(stderr, "Read function definition:");
+      fprintf(stderr, "Read function definition: ");
       FnIR->print(llvm::errs());
       fprintf(stderr, "\n");
     }
