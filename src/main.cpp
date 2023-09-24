@@ -2,6 +2,7 @@
 #include "CallExprAST.h"
 #include "ExprAST.h"
 #include "FunctionAST.h"
+#include "KaleidoscopeJIT.h"
 #include "NumberExprAST.h"
 #include "PrototypeAST.h"
 #include "Token.h"
@@ -37,6 +38,7 @@ static std::unique_ptr<llvm::Module> TheModule;
 static std::map<std::string, llvm::Value *> NamedValues;
 static std::unique_ptr<llvm::legacy::FunctionPassManager>
     TheFunctionPassManager;
+static std::unique_ptr<llvm::orc::KaleidoscopeJIT> TheJIT;
 
 static std::string IdentifierStr; // Filled in if tok_identifier
 static double NumVal;             // Filled in if tok_number
@@ -459,9 +461,10 @@ void HandleTopLevelExpression() {
   }
 }
 
-static void InitializeModule() {
+static void InitializeModuleAndPassManager() {
   TheContext = std::make_unique<llvm::LLVMContext>();
   TheModule = std::make_unique<llvm::Module>("cool JIT", *TheContext);
+  TheModule->setDataLayout(TheJIT->getDataLayout());
 
   // Create a new pass manager attached to it.
   TheFunctionPassManager =
@@ -480,6 +483,10 @@ static void InitializeModule() {
 
   // Create builder.
   Builder = std::make_unique<llvm::IRBuilder<>>(*TheContext);
+
+  // Create a new pass manager.
+  TheFunctionPassManager =
+      std::make_unique<llvm::legacy::FunctionPassManager>(TheModule.get());
 }
 
 static void MainLoop() {
@@ -505,6 +512,9 @@ static void MainLoop() {
 }
 
 int main() {
+  InitializeNativeTarget();
+  InitializeNativeTargetAsmPrinter();
+  InitializeNativeTargetAsmParser();
 
   // Install standard binary operators.
   // 1 is lowest precedence.
@@ -516,8 +526,9 @@ int main() {
   fprintf(stderr, "ready> ");
   getNextToken();
 
-  // Make the module, which holds all the code.
-  InitializeModule();
+  TheJIT = std::make_unique<llvm::orc::KaleidoscopeJIT>();
+
+  InitializeModuleAndPassManager();
 
   MainLoop();
 
