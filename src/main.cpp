@@ -2,6 +2,7 @@
 #include "CallExprAST.h"
 #include "ExprAST.h"
 #include "FunctionAST.h"
+#include "IfExprAST.h"
 #include "KaleidoscopeJIT.h"
 #include "NumberExprAST.h"
 #include "PrototypeAST.h"
@@ -274,6 +275,37 @@ llvm::Function *FunctionAST::codegen() {
 // ----------------------------------------------
 // Parsing functions
 // ----------------------------------------------
+
+static std::unique_ptr<ExprAST> ParseIfExpr() {
+  getNextToken(); // eat if.
+
+  auto Cond = ParseExpression();
+  if (!Cond) {
+    return nullptr;
+  }
+
+  if (CurTok != tok_then) {
+    return LogError("expected then");
+  }
+  getNextToken(); // eat the then.
+
+  auto Then = ParseExpression();
+  if (!Then) {
+    return nullptr;
+  }
+
+  if (CurTok != tok_else) {
+    return LogError("expected else");
+  }
+  getNextToken(); // eat the else.
+
+  auto Else = ParseExpression();
+  if (!Else) {
+    return nullptr;
+  }
+  return std::make_unique<IfExprAST>(std::move(Cond), std::move(Then),
+                                     std::move(Else));
+}
 
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
   auto Result = std::make_unique<NumberExprAST>(NumVal);
