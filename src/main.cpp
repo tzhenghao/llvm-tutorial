@@ -23,6 +23,7 @@
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include <cassert>
 #include <iostream>
 #include <map>
 #include <string>
@@ -39,6 +40,7 @@ static std::map<std::string, llvm::Value *> NamedValues;
 static std::unique_ptr<llvm::legacy::FunctionPassManager>
     TheFunctionPassManager;
 static std::unique_ptr<llvm::orc::KaleidoscopeJIT> TheJIT;
+static llvm::ExitOnError ExitOnErr;
 
 static std::string IdentifierStr; // Filled in if tok_identifier
 static double NumVal;             // Filled in if tok_number
@@ -446,21 +448,6 @@ void HandleExtern() {
   }
 }
 
-void HandleTopLevelExpression() {
-  if (auto FnAST = ParseTopLevelExpr()) {
-    if (auto *FnIR = FnAST->codegen()) {
-      fprintf(stderr, "Read top-level expression:");
-      FnIR->print(llvm::errs());
-      fprintf(stderr, "\n");
-
-      // Remove the anonymous expression.
-      FnIR->eraseFromParent();
-    }
-  } else {
-    getNextToken();
-  }
-}
-
 static void InitializeModuleAndPassManager() {
   TheContext = std::make_unique<llvm::LLVMContext>();
   TheModule = std::make_unique<llvm::Module>("cool JIT", *TheContext);
@@ -487,6 +474,40 @@ static void InitializeModuleAndPassManager() {
   // Create a new pass manager.
   TheFunctionPassManager =
       std::make_unique<llvm::legacy::FunctionPassManager>(TheModule.get());
+}
+
+void HandleTopLevelExpression() {
+  if (auto FnAST = ParseTopLevelExpr()) {
+    if (auto *FnIR = FnAST->codegen()) {
+      fprintf(stderr, "Read top-level expression:");
+      FnIR->print(llvm::errs());
+      fprintf(stderr, "\n");
+
+      // Remove the anonymous expression.
+      FnIR->eraseFromParent();
+
+      auto RT = TheJIT->getMainJITDylib().createResourceTracker();
+
+      auto TSM = llvm::orc::ThreadSafeModule(std::move(TheModule),
+                                             std::move(TheContext));
+      ExitOnErr(TheJIT->addModule(std::move(TSM), RT));
+      InitializeModuleAndPassManager();
+
+      // Search the JIT for the __anon_expr symbol.
+      auto ExprSymbol = ExitOnErr(TheJIT->lookup("__anon_expr"));
+      // assert(ExprSymbol && "Function not found");
+
+      // Get the symbol's address and cast it to the right type (takes no
+      // arguments, returns a double) so we can call it as a native function.
+      double (*FP)() = ExprSymbol.getAddress().toPtr<double (*)()>();
+      fprintf(stderr, "Evaluated to %f\n", FP());
+
+      // Delete the anonymous expression module from the JIT.
+      ExitOnErr(RT->remove());
+    }
+  } else {
+    getNextToken();
+  }
 }
 
 static void MainLoop() {
