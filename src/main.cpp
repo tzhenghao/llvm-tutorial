@@ -368,6 +368,8 @@ static std::unique_ptr<ExprAST> ParsePrimary() {
   switch (CurTok) {
   case tok_identifier:
     return ParseIdentifierExpr();
+  case tok_if:
+    return ParseIfExpr();
   case tok_number:
     return ParseNumberExpr();
   case '(':
