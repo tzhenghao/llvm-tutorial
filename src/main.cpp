@@ -72,6 +72,12 @@ static int gettok() {
       return tok_def;
     } else if (IdentifierStr == "extern") {
       return tok_extern;
+    } else if (IdentifierStr == "if") {
+      return tok_if;
+    } else if (IdentifierStr == "then") {
+      return tok_then;
+    } else if (IdentifierStr == "else") {
+      return tok_else;
     }
     return tok_identifier;
   }
