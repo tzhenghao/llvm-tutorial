@@ -33,6 +33,8 @@ static std::unique_ptr<ExprAST> ParseExpression();
 static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
                                               std::unique_ptr<ExprAST> LHS);
 
+const std::string ANON_EXPR_NAME = "__anon_expr";
+
 static std::unique_ptr<llvm::LLVMContext> TheContext;
 static std::unique_ptr<llvm::IRBuilder<>> Builder;
 static std::unique_ptr<llvm::Module> TheModule;
@@ -418,7 +420,8 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
 
 static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
   if (auto E = ParseExpression()) {
-    auto Proto = std::make_unique<PrototypeAST>("", std::vector<std::string>());
+    auto Proto = std::make_unique<PrototypeAST>(ANON_EXPR_NAME,
+                                                std::vector<std::string>());
     return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
   }
   return nullptr;
@@ -494,8 +497,7 @@ void HandleTopLevelExpression() {
       InitializeModuleAndPassManager();
 
       // Search the JIT for the __anon_expr symbol.
-      auto ExprSymbol = ExitOnErr(TheJIT->lookup("__anon_expr"));
-      // assert(ExprSymbol && "Function not found");
+      auto ExprSymbol = ExitOnErr(TheJIT->lookup(ANON_EXPR_NAME));
 
       // Get the symbol's address and cast it to the right type (takes no
       // arguments, returns a double) so we can call it as a native function.
@@ -547,7 +549,7 @@ int main() {
   fprintf(stderr, "ready> ");
   getNextToken();
 
-  TheJIT = std::make_unique<llvm::orc::KaleidoscopeJIT>();
+  TheJIT = ExitOnErr(llvm::orc::KaleidoscopeJIT::Create());
 
   InitializeModuleAndPassManager();
 
