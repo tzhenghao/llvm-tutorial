@@ -42,6 +42,7 @@ static std::map<std::string, llvm::Value *> NamedValues;
 static std::unique_ptr<llvm::legacy::FunctionPassManager>
     TheFunctionPassManager;
 static std::unique_ptr<llvm::orc::KaleidoscopeJIT> TheJIT;
+static std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
 static llvm::ExitOnError ExitOnErr;
 
 static std::string IdentifierStr; // Filled in if tok_identifier
@@ -203,8 +204,9 @@ llvm::Function *PrototypeAST::codegen() {
 
   // Set names for all arguments.
   unsigned Idx = 0;
-  for (auto &Arg : F->args())
+  for (auto &Arg : F->args()) {
     Arg.setName(Args[Idx++]);
+  }
 
   return F;
 }
@@ -427,30 +429,6 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
   return nullptr;
 }
 
-void HandleDefinition() {
-  if (auto FnAST = ParseDefinition()) {
-    if (auto *FnIR = FnAST->codegen()) {
-      fprintf(stderr, "Read function definition: ");
-      FnIR->print(llvm::errs());
-      fprintf(stderr, "\n");
-    }
-  } else {
-    getNextToken();
-  }
-}
-
-void HandleExtern() {
-  if (auto ProtoAST = ParseExtern()) {
-    if (auto *FnIR = ProtoAST->codegen()) {
-      fprintf(stderr, "Read extern: ");
-      FnIR->print(llvm::errs());
-      fprintf(stderr, "\n");
-    }
-  } else {
-    getNextToken();
-  }
-}
-
 static void InitializeModuleAndPassManager() {
   TheContext = std::make_unique<llvm::LLVMContext>();
   TheModule = std::make_unique<llvm::Module>("cool JIT", *TheContext);
@@ -479,15 +457,40 @@ static void InitializeModuleAndPassManager() {
       std::make_unique<llvm::legacy::FunctionPassManager>(TheModule.get());
 }
 
+void HandleDefinition() {
+  if (auto FnAST = ParseDefinition()) {
+    if (auto *FnIR = FnAST->codegen()) {
+      fprintf(stderr, "Read function definition: ");
+      FnIR->print(llvm::errs());
+      fprintf(stderr, "\n");
+      ExitOnErr(TheJIT->addModule(llvm::orc::ThreadSafeModule(
+          std::move(TheModule), std::move(TheContext))));
+      InitializeModuleAndPassManager();
+    }
+  } else {
+    getNextToken();
+  }
+}
+
+void HandleExtern() {
+  if (auto ProtoAST = ParseExtern()) {
+    if (auto *FnIR = ProtoAST->codegen()) {
+      fprintf(stderr, "Read extern: ");
+      FnIR->print(llvm::errs());
+      fprintf(stderr, "\n");
+      FunctionProtos[ProtoAST->getName()] = std::move(ProtoAST);
+    }
+  } else {
+    getNextToken();
+  }
+}
+
 void HandleTopLevelExpression() {
   if (auto FnAST = ParseTopLevelExpr()) {
-    if (auto *FnIR = FnAST->codegen()) {
+    if (auto FnIR = FnAST->codegen()) {
       fprintf(stderr, "Read top-level expression:");
       FnIR->print(llvm::errs());
       fprintf(stderr, "\n");
-
-      // Remove the anonymous expression.
-      FnIR->eraseFromParent();
 
       auto RT = TheJIT->getMainJITDylib().createResourceTracker();
 
@@ -556,7 +559,7 @@ int main() {
   MainLoop();
 
   // Print out all of the generated code.
-  TheModule->print(llvm::errs(), nullptr);
+  // TheModule->print(llvm::errs(), nullptr);
 
   return 0;
 }
