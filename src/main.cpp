@@ -533,9 +533,9 @@ static void MainLoop() {
 }
 
 int main() {
-  InitializeNativeTarget();
-  InitializeNativeTargetAsmPrinter();
-  InitializeNativeTargetAsmParser();
+  LLVMInitializeNativeTarget();
+  LLVMInitializeNativeAsmPrinter();
+  LLVMInitializeNativeAsmParser();
 
   // Install standard binary operators.
   // 1 is lowest precedence.
