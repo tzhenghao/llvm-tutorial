@@ -14,6 +14,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 #include <memory>
+#include <string>
 
 /// ForExprAST - Expression class for for/in.
 class ForExprAST : public ExprAST {
