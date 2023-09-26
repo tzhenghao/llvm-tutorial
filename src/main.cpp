@@ -370,6 +370,57 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
                                      std::move(Else));
 }
 
+static std::unique_ptr<ExprAST> ParseForExpr() {
+  getNextToken(); // eat "for".
+
+  if (CurTok != tok_identifier) {
+    return LogError("Expected 'for' identifier");
+  }
+
+  std::string IdName = IdentifierStr;
+  getNextToken(); // eat identifier name.
+
+  if (CurTok != '=') {
+    return LogError("Expected '=' identifier");
+  }
+  getNextToken();
+
+  auto Start = ParseExpression();
+  if (!Start) {
+    return nullptr;
+  }
+  if (CurTok != ',') {
+    return LogError("expected ',' after for start value");
+  }
+  getNextToken();
+
+  auto End = ParseExpression();
+  if (!End)
+    return nullptr;
+
+  // The step value is optional, so we'll also handle it differently.
+  std::unique_ptr<ExprAST> Step;
+  if (CurTok == ',') {
+    getNextToken();
+    Step = ParseExpression();
+    if (!Step) {
+      return nullptr;
+    }
+  }
+
+  if (CurTok != tok_in)
+    return LogError("expected 'in' after for");
+  getNextToken();  // eat 'in'.
+
+  auto Body = ParseExpression();
+  if (!Body)
+    return nullptr;
+
+  return std::make_unique<ForExprAST>(IdName, std::move(Start),
+                                       std::move(End), std::move(Step),
+                                       std::move(Body));
+}
+
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
   auto Result = std::make_unique<NumberExprAST>(NumVal);
   getNextToken(); // consume the number
