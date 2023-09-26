@@ -1,6 +1,7 @@
 #include "BinaryExprAST.h"
 #include "CallExprAST.h"
 #include "ExprAST.h"
+#include "ForExprAST.h"
 #include "FunctionAST.h"
 #include "IfExprAST.h"
 #include "KaleidoscopeJIT.h"
