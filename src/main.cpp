@@ -293,6 +293,11 @@ llvm::Value *ForExprAST::codegen() {
 
   // Insert an explicit fall through from the current block to the LoopBB.
   Builder->CreateBr(LoopBB);
+
+  // Start the PHI node with an entry for Start.
+  llvm::PHINode *Variable =
+      Builder->CreatePHI(llvm::Type::getDoubleTy(*TheContext), 2, VarName);
+  Variable->addIncoming(StartVal, PreheaderBB);
 }
 
 llvm::Function *PrototypeAST::codegen() {
