@@ -215,6 +215,17 @@ llvm::Value *CallExprAST::codegen() {
   return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
+llvm::Value *IfExprAST::codegen() {
+  llvm::Value *CondV = Cond->codegen();
+  if (!CondV) {
+    return nullptr;
+  }
+
+  // Convert condition to a bool by comparing non-equal to 0.0.
+  CondV = Builder->CreateFCmpONE(
+      CondV, llvm::ConstantFP::get(*TheContext, llvm::APFloat(0.0)), "ifcond");
+}
+
 llvm::Function *PrototypeAST::codegen() {
   // Mark the function type as (double, double) -> double etc.
   std::vector<llvm::Type *> Doubles(Args.size(),
@@ -303,6 +314,7 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
   if (!Else) {
     return nullptr;
   }
+
   return std::make_unique<IfExprAST>(std::move(Cond), std::move(Then),
                                      std::move(Else));
 }
@@ -368,12 +380,12 @@ static std::unique_ptr<ExprAST> ParsePrimary() {
   switch (CurTok) {
   case tok_identifier:
     return ParseIdentifierExpr();
-  case tok_if:
-    return ParseIfExpr();
   case tok_number:
     return ParseNumberExpr();
   case '(':
     return ParseParenExpr();
+  case tok_if:
+    return ParseIfExpr();
   default:
     return LogError("unknown / undefined token when expecting an expression");
   }
