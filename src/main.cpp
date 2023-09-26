@@ -277,6 +277,24 @@ llvm::Value *IfExprAST::codegen() {
   return PN;
 }
 
+llvm::Value *ForExprAST::codegen() {
+  // Emit the start code first, without 'variable' in scope.
+  llvm::Value *StartVal = Start->codegen();
+  if (!StartVal) {
+    return nullptr;
+  }
+
+  // Make the new basic block for the loop header, inserting after current
+  // block.
+  llvm::Function *TheFunction = Builder->GetInsertBlock()->getParent();
+  llvm::BasicBlock *PreheaderBB = Builder->GetInsertBlock();
+  llvm::BasicBlock *LoopBB =
+      llvm::BasicBlock::Create(*TheContext, "loop", TheFunction);
+
+  // Insert an explicit fall through from the current block to the LoopBB.
+  Builder->CreateBr(LoopBB);
+}
+
 llvm::Function *PrototypeAST::codegen() {
   // Mark the function type as (double, double) -> double etc.
   std::vector<llvm::Type *> Doubles(Args.size(),
@@ -411,7 +429,7 @@ static std::unique_ptr<ExprAST> ParseForExpr() {
   if (CurTok != tok_in) {
     return LogError("expected 'in' after for");
   }
-  getNextToken();  // eat 'in'.
+  getNextToken(); // eat 'in'.
 
   auto Body = ParseExpression();
   if (!Body) {
@@ -420,9 +438,8 @@ static std::unique_ptr<ExprAST> ParseForExpr() {
 
   return nullptr;
 
-  return std::make_unique<ForExprAST>(IdName, std::move(Start),
-                                       std::move(End), std::move(Step),
-                                       std::move(Body));
+  return std::make_unique<ForExprAST>(IdName, std::move(Start), std::move(End),
+                                      std::move(Step), std::move(Body));
 }
 
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
