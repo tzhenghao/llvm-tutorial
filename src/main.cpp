@@ -408,13 +408,17 @@ static std::unique_ptr<ExprAST> ParseForExpr() {
     }
   }
 
-  if (CurTok != tok_in)
+  if (CurTok != tok_in) {
     return LogError("expected 'in' after for");
+  }
   getNextToken();  // eat 'in'.
 
   auto Body = ParseExpression();
-  if (!Body)
+  if (!Body) {
     return nullptr;
+  }
+
+  return nullptr;
 
   return std::make_unique<ForExprAST>(IdName, std::move(Start),
                                        std::move(End), std::move(Step),
