@@ -21,6 +21,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
@@ -28,6 +29,7 @@
 #include <cassert>
 #include <iostream>
 #include <map>
+#include <optional>
 #include <string>
 
 // Prototypes.
@@ -796,9 +798,38 @@ static void MainLoop() {
 }
 
 int main() {
-  LLVMInitializeNativeTarget();
-  LLVMInitializeNativeAsmPrinter();
-  LLVMInitializeNativeAsmParser();
+  auto TargetTriple = LLVMGetDefaultTargetTriple();
+  std::cout << "TargetTriple: " << TargetTriple << "\n";
+
+  // Commenting these out as we're initializing all of them as show below.
+  // LLVMInitializeNativeTarget();
+  // LLVMInitializeNativeAsmPrinter();
+  // LLVMInitializeNativeAsmParser();
+
+  LLVMInitializeAllTargetInfos();
+  LLVMInitializeAllTargets();
+  LLVMInitializeAllTargetMCs();
+  LLVMInitializeAllAsmParsers();
+  LLVMInitializeAllAsmPrinters();
+
+  std::string Error;
+  auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+
+  // Print an error and exit if we couldn't find the requested target.
+  // This generally occurs if we've forgotten to initialise the
+  // TargetRegistry or we have a bogus target triple.
+  if (!Target) {
+    llvm::errs() << Error;
+    return 1;
+  }
+
+  auto CPU = "generic";
+  auto Features = "";
+
+  llvm::TargetOptions opt;
+  auto RM = std::optional<llvm::Reloc::Model>();
+  auto TargetMachine =
+      Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
 
   // Install standard binary operators.
   // 1 is lowest precedence.
