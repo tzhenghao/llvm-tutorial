@@ -310,6 +310,53 @@ llvm::Value *ForExprAST::codegen() {
   if (!Body->codegen()) {
     return nullptr;
   }
+
+  llvm::Value *StepVal = nullptr;
+  if (Step) {
+    StepVal = Step->codegen();
+    if (!StepVal) {
+      return nullptr;
+    }
+  } else {
+    // 1.0 if not specified.
+    StepVal = llvm::ConstantFP::get(*TheContext, llvm::APFloat(1.0));
+  }
+  llvm::Value *NextVar = Builder->CreateFAdd(Variable, StepVal, "nextvar");
+
+  // Compute the end condition.
+  llvm::Value *EndCond = End->codegen();
+  if (!EndCond) {
+    return nullptr;
+  }
+
+  // Convert condition to a bool by comparing non-equal to 0.0.
+  EndCond = Builder->CreateFCmpONE(
+      EndCond, llvm::ConstantFP::get(*TheContext, llvm::APFloat(0.0)),
+      "loopcond");
+
+  // Create the "after loop" block and insert it.
+  llvm::BasicBlock *LoopEndBB = Builder->GetInsertBlock();
+  llvm::BasicBlock *AfterBB =
+      llvm::BasicBlock::Create(*TheContext, "afterloop", TheFunction);
+
+  // Insert the conditional branch into the end of LoopEndBB.
+  Builder->CreateCondBr(EndCond, LoopBB, AfterBB);
+
+  // Any new code will be inserted in AfterBB.
+  Builder->SetInsertPoint(AfterBB);
+
+  // Add a new entry to the PHI node for the backedge.
+  Variable->addIncoming(NextVar, LoopEndBB);
+
+  // Restore the unshadowed variable.
+  if (OldVal) {
+    NamedValues[VarName] = OldVal;
+  } else {
+    NamedValues.erase(VarName);
+  }
+
+  // for expr always returns 0.0.
+  return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*TheContext));
 }
 
 llvm::Function *PrototypeAST::codegen() {
