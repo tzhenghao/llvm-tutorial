@@ -298,6 +298,18 @@ llvm::Value *ForExprAST::codegen() {
   llvm::PHINode *Variable =
       Builder->CreatePHI(llvm::Type::getDoubleTy(*TheContext), 2, VarName);
   Variable->addIncoming(StartVal, PreheaderBB);
+
+  // Within the loop, the variable is defined equal to the PHI node.  If it
+  // shadows an existing variable, we have to restore it, so save it now.
+  llvm::Value *OldVal = NamedValues[VarName];
+  NamedValues[VarName] = Variable;
+
+  // Emit the body of the loop.  This, like any other expr, can change the
+  // current BB.  Note that we ignore the value computed by the body, but don't
+  // allow an error.
+  if (!Body->codegen()) {
+    return nullptr;
+  }
 }
 
 llvm::Function *PrototypeAST::codegen() {
