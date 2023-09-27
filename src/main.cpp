@@ -798,38 +798,10 @@ static void MainLoop() {
 }
 
 int main() {
-  auto TargetTriple = LLVMGetDefaultTargetTriple();
-  std::cout << "TargetTriple: " << TargetTriple << "\n";
-
   // Commenting these out as we're initializing all of them as show below.
-  // LLVMInitializeNativeTarget();
-  // LLVMInitializeNativeAsmPrinter();
-  // LLVMInitializeNativeAsmParser();
-
-  LLVMInitializeAllTargetInfos();
-  LLVMInitializeAllTargets();
-  LLVMInitializeAllTargetMCs();
-  LLVMInitializeAllAsmParsers();
-  LLVMInitializeAllAsmPrinters();
-
-  std::string Error;
-  auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
-
-  // Print an error and exit if we couldn't find the requested target.
-  // This generally occurs if we've forgotten to initialise the
-  // TargetRegistry or we have a bogus target triple.
-  if (!Target) {
-    llvm::errs() << Error;
-    return 1;
-  }
-
-  auto CPU = "generic";
-  auto Features = "";
-
-  llvm::TargetOptions opt;
-  auto RM = std::optional<llvm::Reloc::Model>();
-  auto TargetMachine =
-      Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+  LLVMInitializeNativeTarget();
+  LLVMInitializeNativeAsmPrinter();
+  LLVMInitializeNativeAsmParser();
 
   // Install standard binary operators.
   // 1 is lowest precedence.
@@ -847,8 +819,62 @@ int main() {
 
   MainLoop();
 
+  LLVMInitializeAllTargetInfos();
+  LLVMInitializeAllTargets();
+  LLVMInitializeAllTargetMCs();
+  LLVMInitializeAllAsmParsers();
+  LLVMInitializeAllAsmPrinters();
+
+  auto TargetTriple = LLVMGetDefaultTargetTriple();
+  TheModule->setTargetTriple(TargetTriple);
+  std::cout << "TargetTriple: " << TargetTriple << "\n";
+
+  std::string Error;
+  auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+
+  // Print an error and exit if we couldn't find the requested target.
+  // This generally occurs if we've forgotten to initialise the
+  // TargetRegistry or we have a bogus target triple.
+  if (!Target) {
+    llvm::errs() << Error;
+    return 1;
+  }
+
   // Print out all of the generated code.
-  // TheModule->print(llvm::errs(), nullptr);
+  TheModule->print(llvm::errs(), nullptr);
+
+  auto CPU = "generic";
+  auto Features = "";
+
+  llvm::TargetOptions opt;
+  auto RM = std::optional<llvm::Reloc::Model>();
+  auto TargetMachine =
+      Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+
+  TheModule->setDataLayout(TargetMachine->createDataLayout());
+  TheModule->setTargetTriple(TargetTriple);
+
+  auto Filename = "output.o";
+  std::error_code EC;
+  llvm::raw_fd_ostream dest(Filename, EC, llvm::sys::fs::OF_None);
+
+  if (EC) {
+    llvm::errs() << "Could not open file: " << EC.message();
+    return 1;
+  }
+
+  llvm::legacy::PassManager pass;
+  auto FileType = llvm::CodeGenFileType::CGFT_ObjectFile;
+
+  if (TargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
+    llvm::errs() << "TargetMachine can't emit a file of this type";
+    return 1;
+  }
+
+  pass.run(*TheModule);
+  dest.flush();
+
+  llvm::outs() << "Wrote " << Filename << "\n";
 
   return 0;
 }
