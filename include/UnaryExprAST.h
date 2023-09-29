@@ -12,16 +12,15 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
-#include <string>
+#include <memory>
 
-/// VariableExprAST - Expression class for referencing a variable. Think "index,
-/// a" etc.
-class VariableExprAST : public ExprAST {
-  std::string Name;
+class UnaryExprAST : public ExprAST {
+  char Opcode;
+  std::unique_ptr<ExprAST> Operand;
 
 public:
-  VariableExprAST(const std::string &Name) : Name(Name) {}
+  UnaryExprAST(char Opcode, std::unique_ptr<ExprAST> Operand)
+      : Opcode(Opcode), Operand(std::move(Operand)) {}
 
   llvm::Value *codegen() override;
-  const std::string &getName() const { return Name; }
 };
