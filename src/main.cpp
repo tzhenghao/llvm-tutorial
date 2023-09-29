@@ -39,7 +39,8 @@ static std::unique_ptr<ExprAST> ParseExpression();
 static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
                                               std::unique_ptr<ExprAST> LHS);
 
-const std::string ANON_EXPR_NAME = "__anon_expr";
+// const std::string ANON_EXPR_NAME = "__anon_expr";
+const std::string ANON_EXPR_NAME = "main"; // for AOT compilation
 
 static std::unique_ptr<llvm::LLVMContext> TheContext;
 static std::unique_ptr<llvm::IRBuilder<>> Builder;
@@ -928,6 +929,7 @@ static void InitializeModuleAndPassManager() {
   TheFunctionPassManager =
       std::make_unique<llvm::legacy::FunctionPassManager>(TheModule.get());
 
+#if 0  // for AOT compilation
   // Do simple "peephole" optimizations and bit-twiddling optimizations.
   TheFunctionPassManager->add(llvm::createInstructionCombiningPass());
   // Reassociate expressions.
@@ -936,6 +938,7 @@ static void InitializeModuleAndPassManager() {
   TheFunctionPassManager->add(llvm::createGVNPass());
   // Simplify the control flow graph (deleting unreachable blocks, etc).
   TheFunctionPassManager->add(llvm::createCFGSimplificationPass());
+#endif // for AOT compilation
 
   TheFunctionPassManager->doInitialization();
 
@@ -1025,7 +1028,7 @@ extern "C" DLLEXPORT double printd(double X) {
 
 static void MainLoop() {
   while (true) {
-    fprintf(stderr, "ready> ");
+    // fprintf(stderr, "ready> ");  // commenting out for AOT compilation.
     switch (CurTok) {
     case tok_eof:
       return;
@@ -1058,7 +1061,7 @@ int main() {
   BinopPrecedence['-'] = 20;
   BinopPrecedence['*'] = 40; // highest
 
-  fprintf(stderr, "ready> ");
+  // fprintf(stderr, "ready> ");  // commenting out for AOT compilation.
   getNextToken();
 
   TheJIT = ExitOnErr(llvm::orc::KaleidoscopeJIT::Create());
@@ -1075,7 +1078,7 @@ int main() {
 
   auto TargetTriple = LLVMGetDefaultTargetTriple();
   TheModule->setTargetTriple(TargetTriple);
-  std::cout << "TargetTriple: " << TargetTriple << "\n";
+  // std::cout << "TargetTriple: " << TargetTriple << "\n";
 
   std::string Error;
   auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
@@ -1122,7 +1125,7 @@ int main() {
   pass.run(*TheModule);
   dest.flush();
 
-  llvm::outs() << "Wrote " << Filename << "\n";
+  // llvm::outs() << "Wrote " << Filename << "\n";
 
   return 0;
 }
